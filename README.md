@@ -1,3 +1,5 @@
+This repository is copy of https://github.com/nopnop2002/ili9340spi_rpi
+
 # ili9340spi_rpi
 ILI9340 SPI TFT Library for Raspberry Pi/Orange Pi
 

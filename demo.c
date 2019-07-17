@@ -9,7 +9,7 @@
 
 #include "ili9340.h"
 
-#define JAPANESE 0
+#define JAPANESE 1
 #define _DEBUG_ 0
 
 //When you'd like to wait by a keyboard entries, enable this line.
@@ -380,7 +380,7 @@ time_t FillRectTest(int width, int height) {
     uint16_t blue;
     srand( (unsigned int)time( NULL ) );
     int i;
-    for(i=1;i<100;i++) {
+    for(i=1;i<1000;i++) {
         red=rand()%255;
         green=rand()%255;
         blue=rand()%255;
@@ -420,6 +420,78 @@ time_t ColorTest(int width, int height) {
 }
 
 
+time_t pixelTest(int width, int height) {
+    uint16_t color;
+
+	uint8_t buf[54];
+	uint16_t p, c;
+	uint32_t isize, ioffset, iwidth, iheight, ibpp, fpos, rowbytes;
+
+	FILE *f = fopen("lenna.bmp", "rb");
+	if (f != NULL) {
+		fseek(f, 0L, SEEK_SET);
+		fread(buf, 30, 1, f);
+
+		isize =	 buf[2] + (buf[3]<<8) + (buf[4]<<16) + (buf[5]<<24);
+		ioffset = buf[10] + (buf[11]<<8) + (buf[12]<<16) + (buf[13]<<24);
+		iwidth =	buf[18] + (buf[19]<<8) + (buf[20]<<16) + (buf[21]<<24);
+		iheight = buf[22] + (buf[23]<<8) + (buf[24]<<16) + (buf[25]<<24);
+		ibpp =		buf[28] + (buf[29]<<8);
+
+		printf("\n\n");
+		printf("File Size: %u\nOffset: %u\nWidth: %u\nHeight: %u\nBPP: %u\n\n",isize,ioffset,iwidth,iheight,ibpp);
+    }
+
+    int i,j;
+    uint16_t image[128*161];
+
+	for (i=0; i<(int)iheight; i++){
+        for (j=0; j<(int)iwidth; j++) {
+            fread(buf, 3, 1, f);
+            image[(iheight-1-i)*iwidth+iwidth-1-j]=rgb565_conv(buf[0], buf[1], buf[2]);
+            //image[128-i+j*128]=rgb565_conv(buf[0], buf[1], buf[2]);
+            //color=rgb565_conv(buf[0], buf[1], buf[2]);
+            //lcdDrawPixel(j,iheight-i,color);
+        }
+    }
+
+    fclose(f);
+
+    struct timeval startTime, endTime;
+    gettimeofday(&startTime, NULL);
+
+    lcdDrawImage(0,0,128,160,image);
+
+	/* for (i=0; i<(int)iheight; i++){
+        for (j=0; j<(int)iwidth; j++) {
+            //fread(buf, 3, 1, f);
+            lcdDrawPixel(j,iheight-i,image[j][iheight-i]);
+        }
+    }*/
+
+    /*uint16_t red;
+    uint16_t green;
+    uint16_t blue;
+    srand( (unsigned int)time( NULL ) );
+    int i;
+    for(i=1;i<100000;i++) {
+        red=rand()%255;
+        green=rand()%255;
+        blue=rand()%255;
+        color=rgb565_conv(red, green, blue);
+        uint16_t xpos=i%width;
+        uint16_t ypos=i/height;
+        //uint16_t size=rand()%(width/5);
+        //lcdDrawFillRect(xpos, ypos, xpos+size, ypos+size, color);
+        lcdDrawPixel(xpos,ypos,color);
+    }*/
+
+    //lcdDrawPixel
+    gettimeofday(&endTime, NULL);
+    time_t diff = elapsedTime(startTime, endTime);
+    printf("%s elapsed time[ms]=%ld\n",__func__, diff);
+    return diff;
+}
 
 int main(int argc, char **argv)
 {
@@ -473,7 +545,7 @@ if(_DEBUG_)printf("ReadTFTConfig:screenWidth=%d height=%d\n",screenWidth, screen
     lcdSetup();
 
 
-    ColorBarTest(screenWidth, screenHeight);
+    /* ColorBarTest(screenWidth, screenHeight);
     WAIT;
 
     if (screenWidth >= 240) { 
@@ -517,8 +589,15 @@ if(_DEBUG_)printf("ReadTFTConfig:screenWidth=%d height=%d\n",screenWidth, screen
     WAIT;
 
     ColorTest(screenWidth, screenHeight);
+    WAIT;*/
+
+    pixelTest(screenWidth, screenHeight);
     WAIT;
 
+    //FillTest();
+    WAIT;
+
+    /* 
     // Multi Font Test
     uint16_t color;
     unsigned char utf8[64];;
@@ -527,7 +606,7 @@ if(_DEBUG_)printf("ReadTFTConfig:screenWidth=%d height=%d\n",screenWidth, screen
     int margin = 10;
     lcdFillScreen( BLACK);
     color = WHITE;
-    lcdSetFontDirection(DIRECTION0);
+    lcdSetFontDirection(DIRECTION270);
     int xd = 0;
     int yd = 1;
     if(screenWidth < screenHeight) {
@@ -538,13 +617,13 @@ if(_DEBUG_)printf("ReadTFTConfig:screenWidth=%d height=%d\n",screenWidth, screen
     }
 
     strncpy((char *)utf8, "16Dot Gothic Font", sizeof(utf8));
-    if(JAPANESE)strncpy((char *)utf8, "16ドットゴシック", sizeof(utf8));
+    if(JAPANESE)strncpy((char *)utf8, "小坂文彦", sizeof(utf8));
     lcdDrawUTF8String(fx16G, xpos, ypos, utf8, color);
 
     xpos = xpos - (24 * xd) - (margin * xd);
     ypos = ypos - (16 * yd) - (margin * yd);
     strncpy((char *)utf8, "24Dot Gothic Font", sizeof(utf8));
-    if(JAPANESE)strncpy((char *)utf8, "24ドットゴシック", sizeof(utf8));
+    if(JAPANESE)strncpy((char *)utf8, "小坂文彦", sizeof(utf8));
     lcdDrawUTF8String(fx24G, xpos, ypos, utf8, color);
 
     xpos = xpos - (32 * xd) - (margin * xd);
@@ -576,10 +655,11 @@ if(_DEBUG_)printf("ReadTFTConfig:screenWidth=%d height=%d\n",screenWidth, screen
         if(JAPANESE)strncpy((char *)utf8, "32ドット明朝", sizeof(utf8));
         lcdDrawUTF8String(fx32M, xpos, ypos, utf8, color);
     }
-    lcdSetFontDirection(0);
+    lcdSetFontDirection(3);
     WAIT;
 
-    //lcdDisplayOff();
+    */
+    lcdDisplayOff();
 
     return 0;
 }

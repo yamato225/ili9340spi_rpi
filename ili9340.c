@@ -64,14 +64,14 @@ int _offsety;
 // D/C=LOW then,write command(8bit)
 void lcdWriteCommandByte(uint8_t c){
   digitalWrite(D_C, LOW);
-  wiringPiSPIDataRW(0, &c, 1);
+  //wiringPiSPIDataRW(0, &c, 1);
 }
 
 // Write Data 8Bit
 // D/C=HIGH then,write data(8bit)
 void lcdWriteDataByte(uint8_t c){
   digitalWrite(D_C, HIGH);
-  wiringPiSPIDataRW(0, &c, 1);
+  //wiringPiSPIDataRW(0, &c, 1);
 }
 
 // Write Data 16Bit
@@ -91,7 +91,7 @@ void lcdWriteAddr(uint8_t addr1, uint8_t addr2){
   byte[2] = (addr2 >> 8) & 0xFF;
   byte[3] = addr2 & 0xFF;
   digitalWrite(D_C, HIGH);
-  wiringPiSPIDataRW(0, byte, 4);
+  //wiringPiSPIDataRW(0, byte, 4);
 }
 
 // Write Data 16Bit
@@ -104,7 +104,7 @@ void lcdWriteColor(uint16_t color, uint16_t size) {
     byte[index++] = color & 0xFF;
   }
   digitalWrite(D_C, HIGH);
-  wiringPiSPIDataRW(0, byte, size*2);
+  //wiringPiSPIDataRW(0, byte, size*2);
 }
 #endif
 
@@ -142,6 +142,7 @@ void lcdWriteColor(uint16_t color, uint16_t size) {
   int i;
   for(i=0;i<size;i++) bcm2835_spi_write(color);
 }
+
 #endif
 
 
@@ -359,6 +360,36 @@ void lcdDrawFillRect(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_
       lcdWriteDataWord(color);
     }
 #endif
+  }
+}
+
+void lcdDrawImage(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t *image) {
+  int i,j;
+  if (x1 >= _width) return;
+  if (x2 >= _width) x2=_width-1;
+  if (y1 >= _height) return;
+  if (y2 >= _height) y2=_height-1;
+
+  uint16_t _x1 = x1 + _offsetx;
+  uint16_t _x2 = x2 + _offsetx;
+  uint16_t _y1 = y1 + _offsety;
+  uint16_t _y2 = y2 + _offsety;
+  lcdWriteCommandByte(0x2A); // set column(x) address
+  lcdWriteDataWord(_x1);
+  lcdWriteDataWord(_x2);
+  //lcdWriteAddr(_x1, _x2); // Don't work 
+  lcdWriteCommandByte(0x2B); // set Page(y) address
+  lcdWriteDataWord(_y1);
+  lcdWriteDataWord(_y2);
+  //lcdWriteAddr(_y1, _y2); // Don't work 
+  lcdWriteCommandByte(0x2C); // Memory Write
+  bcm2835_gpio_write(D_C, HIGH);
+  printf("%d,%d,%d,%d",_x1,_x2,_y1,_y2);
+	for (i=0; i<128; i++){
+        for (j=0; j<128; j++) {
+            //fread(buf, 3, 1, f);
+            bcm2835_spi_write(image[i*128+j]);
+        }
   }
 }
 
