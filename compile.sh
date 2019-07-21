@@ -1,2 +1,2 @@
 #!/bin/bash
-cc -o demo demo.c fontx.c ili9340.c -lbcm2835 -lm -DBCM
+g++ `pkg-config --cflags opencv4` -o playmp4 play_movie.cpp -g `pkg-config --libs opencv4`

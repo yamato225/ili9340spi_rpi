@@ -6,3 +6,4 @@ cd bcm2835-1.56
 make
 sudo make check
 sudo make install
+sudo rm -rf bcm2835-1.56.tar.gz bcm2835-1.56
