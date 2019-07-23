@@ -1,5 +1,11 @@
 This repository is forked from https://github.com/nopnop2002/ili9340spi_rpi
 
+This can play H.264 video on SPI TFT.
+
+This needs OpenCV & gstreamer.
+Please follow this procedure.
+https://qiita.com/yamato225/items/0870beca1822c6dccad3
+
 # ili9340spi_rpi
 ILI9340 SPI TFT Library for Raspberry Pi/Orange Pi
 
