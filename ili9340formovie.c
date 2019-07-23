@@ -1,4 +1,4 @@
-// ili9340.c
+// ili9340formovie.c
 // Used by bcm2835 library.(Mike McCauley)
 //
 // Original is http://imagewriteriij.blogspot.jp/2014/01/raspberry-pi-9-lcd-1.html
@@ -27,6 +27,8 @@
 //
 //
 
+// add lcdDrawImage 20190722 by yamato225
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -41,6 +43,11 @@
 #endif
 
 #include "ili9340formovie.h"
+
+#include <opencv2/opencv.hpp>
+#include <opencv2/videoio.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 
 #define D_C  2  // GPIO2=Pin#3
 #define RES  3  // GPIO3=Pin#5
@@ -276,8 +283,8 @@ void lcdDrawFillRect(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_
   }
 }
 
-void lcdDrawImage(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t *image) {
-  int i,j;
+void lcdDrawImage(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, cv::Mat *image) {
+  int x,y;
   if (x1 >= _width) return;
   if (x2 >= _width) x2=_width-1;
   if (y1 >= _height) return;
@@ -297,11 +304,14 @@ void lcdDrawImage(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t *
   //lcdWriteAddr(_y1, _y2); // Don't work 
   lcdWriteCommandByte(0x2C); // Memory Write
   bcm2835_gpio_write(D_C, HIGH);
-  printf("%d,%d,%d,%d",_x1,_x2,_y1,_y2);
-	for (i=0; i<160; i++){
-        for (j=0; j<128; j++) {
+  for (x=0; x<160; x++){
+        for (y=0; y<128; y++) {
+            cv::Vec3b* ptr = image->ptr<cv::Vec3b>( y );
             //fread(buf, 3, 1, f);
-            bcm2835_spi_write(image[i*128+j]);
+            cv::Vec3b bgr = ptr[x];
+            //rgb565_conv(bgr[0], bgr[1], bgr[2]);
+            bcm2835_spi_write(rgb565_conv(bgr[0], bgr[1], bgr[2]));
+            //bcm2835_spi_writenb(test,256);
             //usleep(1000);
         }
   }

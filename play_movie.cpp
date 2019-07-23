@@ -1,14 +1,21 @@
-#include <iostream>
-#include <iostream>
-#include <string>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
 #include <time.h>
 #include <sys/time.h>
+
 #include <opencv2/opencv.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
 #include "ili9340formovie.h"
+
+#define _DEBUG_ 0
+#define WAIT sleep(5)
 
 time_t elapsedTime(struct timeval startTime, struct timeval endTime) {
     time_t diffsec = difftime(endTime.tv_sec, startTime.tv_sec);
@@ -23,7 +30,52 @@ time_t elapsedTime(struct timeval startTime, struct timeval endTime) {
     return diff;
 }
 
-time_t pixelTest(int width, int height) {
+time_t ColorBarTest(int width, int height) {
+    struct timeval startTime, endTime;
+    gettimeofday(&startTime, NULL);
+
+    uint16_t y1 = height/3;
+    uint16_t y2 = (height/3)*2;
+    lcdDrawFillRect(0, 0, width-1, y1-1, RED);
+    lcdDrawFillRect(0, y1-1, width-1, y2-1, GREEN);
+    lcdDrawFillRect(0, y2-1, width-1, height-1, BLUE);
+
+    gettimeofday(&endTime, NULL);
+    time_t diff = elapsedTime(startTime, endTime);
+    printf("%s elapsed time[ms]=%ld\n",__func__, diff);
+    return diff;
+}
+
+
+int ReadTFTConfig(char *path, int *width, int *height, int *offsetx, int *offsety) {
+  FILE *fp;
+  char buff[128];
+  
+//  printf("path=%s\n",path);
+  fp = fopen(path,"r");
+  if(fp == NULL) return 0;
+  while (fgets(buff,128,fp) != NULL) {
+//    printf("buf=%s\n",buff);
+//    printf("buff[0]=%x\n",buff[0]);
+    if (buff[0] == '#') continue;
+    if (buff[0] == 0x0a) continue;
+    if (strncmp(buff, "width=", 6) == 0) {
+      sscanf(buff, "width=%d height=%d",width,height);
+if(_DEBUG_)printf("width=%d height=%d\n",*width,*height);
+    } else if (strncmp(buff, "offsetx=", 8) == 0) {
+      sscanf(buff, "offsetx=%d",offsetx);
+if(_DEBUG_)printf("offsetx=%d\n",*offsetx);
+    } else if (strncmp(buff, "offsety=", 8) == 0) {
+      sscanf(buff, "offsety=%d",offsety);
+if(_DEBUG_)printf("offsety=%d\n",*offsety);
+    }
+  }
+  fclose(fp);
+  return 1;
+}
+
+
+time_t pixelTest() {
     uint16_t color;
 
     uint16_t image[128*160];
@@ -32,8 +84,7 @@ time_t pixelTest(int width, int height) {
     struct timeval startTime, endTime;
 
 	cv::VideoCapture cap;
-	cap.open("filesrc location=/home/pi/D0002040402_00000_V_000.mp4 ! qtdemux ! h264parse ! omxh264dec ! videoconvert ! videoscale ! video/x-raw,width=160,height=128 ! queue ! appsink");
-	//cap.open("/home/pi/D0002040402_00000_V_000.mp4");
+	cap.open("filesrc location=/home/pi/D0002040402_00000_V_000.mp4 ! qtdemux name=demux demux.video_0 ! h264parse ! omxh264dec ! videorate ! video/x-raw,framerate=20/1 ! videoconvert ! videoscale ! video/x-raw,width=160,height=128 ! appsink sync=false");
 
 	if (!cap.isOpened())
 	{
@@ -43,17 +94,13 @@ time_t pixelTest(int width, int height) {
 
 	cv::Mat srcImg;
 	int b,g,r;
-	while (cap.read(srcImg))
+	while (1)
 	{
         gettimeofday(&startTime, NULL);
-        for( int y = 0; y < srcImg.rows; y++ ) {
-            cv::Vec3b* ptr = srcImg.ptr<cv::Vec3b>( y );
-            for( int x = 0; x < srcImg.cols; x++ ) {
-                cv::Vec3b bgr = ptr[x];
-                image[y*128+x]=rgb565_conv(bgr[0], bgr[1], bgr[2]);
-            }
+        if (!cap.read(srcImg)){
+            break;
         }
-        lcdDrawImage(0,0,127,159,image);
+        lcdDrawImage(0,0,127,159,&srcImg);
         gettimeofday(&endTime, NULL);
         diff = elapsedTime(startTime, endTime);
         printf("%s elapsed time[ms]=%ld\n",__func__, diff);
@@ -64,34 +111,43 @@ time_t pixelTest(int width, int height) {
 
 int main(int argc, char *argv[])
 {
-	cv::VideoCapture gstreamer;
-	//gstreamer.open("filesrc location=D0002040402_00000_V_000.mp4 ! mp4mux ! h264parse ! omxh264dec ! videoconvert ! queue ! appsink");
-	gstreamer.open("filesrc location=/home/pi/D0002040402_00000_V_000.mp4 ! qtdemux ! h264parse ! omxh264dec ! videoconvert ! videoscale ! video/x-raw,width=160,height=128 ! queue ! appsink");
-	//gstreamer.open("D0002040402_00000_V_000.mp4");
+    int i;
+    int screenWidth = 0;
+    int screenHeight = 0;
+    int offsetx = 0;
+    int offsety = 0;
+    char dir[128];
+    char cpath[128];
 
-	if (!gstreamer.isOpened())
-	{
-		printf("=ERR= fail to open\n");
-		return -1;
-	}
+if(_DEBUG_)  printf("argv[0]=%s\n",argv[0]);
+    strcpy(dir, argv[0]);
+    for(i=strlen(dir);i>0;i--) {
+        if (dir[i-1] == '/') {
+          dir[i] = 0;
+          break;
+        } // end if
+    } // end for
+if(_DEBUG_)printf("dir=%s\n",dir);
+    strcpy(cpath,dir);
+    strcat(cpath,"tft.conf");
+if(_DEBUG_)printf("cpath=%s\n",cpath);
+    if (ReadTFTConfig(cpath, &screenWidth, &screenHeight, &offsetx, &offsety) == 0) {
+        printf("%s Not found\n",cpath);
+        return 0;
+    }
+if(_DEBUG_)printf("ReadTFTConfig:screenWidth=%d height=%d\n",screenWidth, screenHeight);
+    printf("Your TFT resolution is %d x %d.\n",screenWidth, screenHeight);
+    printf("Your TFT offsetx    is %d.\n",offsetx);
+    printf("Your TFT offsety    is %d.\n",offsety);
 
+    std::cout << "start initializing" << std::endl;
+    lcdInit(screenWidth, screenHeight, offsetx, offsety);
+    std::cout << "start reset" << std::endl;
+    lcdReset();
+    std::cout << "start setup" << std::endl;
+    lcdSetup();
 
-	int i=0;
-	cv::Mat GstCap;
-	int b,g,r;
-	while (gstreamer.read(GstCap))
-	{
-		cv::Vec3b* ptr = GstCap.ptr<cv::Vec3b>( 10 );
-		cv::Vec3b bgr = ptr[10];
-		b=bgr[0];
-		g=bgr[1];
-		r=bgr[2];
-		//sprintf(filename,"nfs/preview/%04d.bmp",i);
-		//cv::imwrite(filename,GstCap);
-		//cv::imshow("z",GstCap);
-		//cv::waitKey(0);
-		std::cout << "frame=" <<  i << "(" << r << "," << g << "," << b << ")" << std::endl;
-		i++;
-	}
-	return 0;
+    ColorBarTest(screenWidth, screenHeight);
+
+    pixelTest();
 }

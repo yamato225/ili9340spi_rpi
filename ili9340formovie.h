@@ -13,6 +13,11 @@
 #define DIRECTION180    2
 #define DIRECTION270    3
 
+#include <opencv2/opencv.hpp>
+#include <opencv2/videoio.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+
 void lcdWriteCommandByte(uint8_t c);
 void lcdWriteDataByte(uint8_t c);
 void lcdWriteDataWord(uint16_t w);
@@ -33,4 +38,4 @@ void lcdDrawRoundRect(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16
 void lcdDrawArrow(uint16_t x0,uint16_t y0,uint16_t x1,uint16_t y1,uint16_t w,uint16_t color);
 void lcdDrawFillArrow(uint16_t x0,uint16_t y0,uint16_t x1,uint16_t y1,uint16_t w,uint16_t color);
 uint16_t rgb565_conv(uint16_t r,uint16_t g,uint16_t b);
-void lcdDrawImage(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t *image);
+void lcdDrawImage(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, cv::Mat *image);
