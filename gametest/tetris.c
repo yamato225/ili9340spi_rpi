@@ -74,8 +74,12 @@ time_t ColorBarTest(int width, int height) {
     return diff;
 }
 
-#define draw_width 13
+#define draw_width 12
 #define draw_height 16 
+#define grid_width 14
+#define grid_height 20
+#define draw_start_y 18
+#define draw_start_x 1
 
 void lcddrawGrid(int drawGrid[]){
     int draw_x,draw_y;
@@ -84,13 +88,25 @@ void lcddrawGrid(int drawGrid[]){
     for(draw_y=0;draw_y<draw_height;draw_y++){
         for(draw_x=0;draw_x<draw_width;draw_x++){
             if(drawGrid[draw_y*draw_width+draw_x] > 0){
-                color=WHITE;
+                color=GREEN;
             }else{
                 color=BLACK;
             }
-            lcdDrawFillRect(draw_x*11, draw_y*10, draw_x*11+8, draw_y*10+8, color);
+            lcdDrawFillRect(draw_x*11, draw_y*10, draw_x*11+9, draw_y*10+8, color);
         }
     }
+}
+
+void debugGrid(int gridMat[]){
+    int x,y;
+    for(y=0;y<grid_height;y++){
+        printf("%02d:",y);
+        for(x=0;x<grid_width;x++){
+            printf("%d",gridMat[y*grid_width+x]);
+        }
+        printf("\n");
+    }
+    printf("----------------\n");
 }
 
 time_t tetris() {
@@ -98,10 +114,7 @@ time_t tetris() {
 
     lcdFillScreen(BLACK);
 
-    const int grid_width=14;
-    const int grid_height=20;
-
-    int gridMat[grid_width][grid_height];
+    int gridMat[grid_width*grid_height];
     int drawGrid[draw_width*draw_height];
 
     int mino[4][4];
@@ -137,19 +150,19 @@ time_t tetris() {
     int i;
     int draw_x,draw_y;
     int mx,my;
-    mx=-1;my=0;
-    i=1;
+    mx=0;my=0;
+    i=2;
     for(y=0;y<4;y++){
         for(x=0;x<4;x++){
             mino[x][y]=org_mino[i*16+y*4+x];
         }
     }
     srand( (unsigned int)time( NULL ) );
-    for(y=0;y<20;y++){
-        for(x=0;x<14;x++){
-            gridMat[x][y]=0;
-            if(x==0 || x==13 || y==19){
-                gridMat[x][y]=1;
+    for(y=0;y<grid_height;y++){
+        for(x=0;x<grid_width;x++){
+            gridMat[y*grid_width+x]=0;
+            if(x==0 || x==13 || y==19 || (y>16 && rand()%2==0)){
+                gridMat[y*grid_width+x]=1;
             }
         }
     }
@@ -163,7 +176,7 @@ time_t tetris() {
             for(y=0;y<4;y++){
                 for(x=0;x<4;x++){
                     if (mino[x][y] >0){
-                        gridMat[mx+x][my+y]=0;
+                        gridMat[(my+y)*grid_width+mx+x]=0;
                     }
                 }
             }
@@ -173,18 +186,40 @@ time_t tetris() {
 
             //そろってるかチェック
             int xblock_num=0;
-            for(y=draw_height-1;y>=0;y--){
+            int check_y,check_x;
+            for(check_y=grid_height-2;check_y>=3;){
                 xblock_num=0;
-                for(x=0;x<draw_width;x++){
-                    xblock_num+=drawGrid[y*draw_width+x]>0 ? 1 : 0;
+                printf("y=%d\n",check_y);
+                for(check_x=0;check_x<grid_width;check_x++){
+                    xblock_num+=gridMat[check_y*grid_width+check_x]>0 ? 1 : 0;
                 }
-                if(xblock_num == draw_width){
-                    printf("sorotta");
-                    return 0;
+                if(xblock_num == grid_width){
+                    //何らかのエフェクトを加える
+                    //1行下にずらす。
+                    int empty_row[grid_width]={1,0,0,0,0,0,0,0,0,0,0,0,0,1};
+                    int tmp_gridMat[grid_width*grid_height];
+                    for(i=0;i<grid_width*grid_height;i++){
+                        tmp_gridMat[i]=gridMat[i];
+                    }
+                    for(i=0;i<grid_width*(check_y+1);i++){
+                        gridMat[i]=i<grid_width ? empty_row[i] : tmp_gridMat[i-grid_width];
+                    }
+                    debugGrid(gridMat);
+                    for(y=0;y<draw_height;y++){
+                        for(x=0;x<draw_width;x++){
+                            drawGrid[y*draw_width+x]=gridMat[(18-y)*grid_width+x+1];
+                        }
+                    }
+                    lcddrawGrid(drawGrid);
+                    sleep(1);
+                }else{
+                    printf("else\n");
+                    check_y--;
                 }
             }
 
             mx=(mx+1)%13;my=0;
+            
             //i=rand()%5;
             i=2;
             for(y=0;y<4;y++){
@@ -210,23 +245,16 @@ time_t tetris() {
         for(y=0;y<4;y++){
             for(x=0;x<4;x++){
                 if (mino[x][y] >0){
-                    gridMat[mx+x][my+y]=1;
+                    gridMat[(my+y)*grid_width+mx+x]=1;
                 }
             }
         }
 
-        for(y=0;y<20;y++){
-            printf("%02d:",y);
-            for(x=0;x<14;x++){
-                printf("%d",gridMat[x][y]);
-            }
-            printf("\n");
-        }
+        debugGrid(gridMat);
 
-        printf("----------------\n");
         for(y=0;y<4;y++){
             for(x=0;x<4;x++){
-                if(gridMat[mx+x][my+y]>0){
+                if(gridMat[(my+y)*grid_width+mx+x]>0){
                     printf("@");
                 }else{
                     printf(" ");
@@ -240,11 +268,11 @@ time_t tetris() {
         for(y=3;y>=0;y--){
             for(x=0;x<4;x++){
                 if (y==3){
-                    if (mino[x][y] >0 && gridMat[mx+x][my+y+1]>0){
+                    if (mino[x][y] >0 && gridMat[(my+y+1)*grid_width+mx+x]>0){
                         isTouch=true;
                     }   
                 }else{
-                    if (mino[x][y]>0 && mino[x][y+1]==0 && gridMat[mx+x][my+y+1]>0){
+                    if (mino[x][y]>0 && mino[x][y+1]==0 && gridMat[(my+y+1)*grid_width+mx+x]>0){
                         isTouch=true;
                     }
                 }
@@ -254,7 +282,7 @@ time_t tetris() {
 
         for(y=0;y<draw_height;y++){
             for(x=0;x<draw_width;x++){
-                drawGrid[y*draw_width+x]=gridMat[x+1][18-y];
+                drawGrid[y*draw_width+x]=gridMat[(18-y)*grid_width+x+1];
             }
         }
 
@@ -264,7 +292,7 @@ time_t tetris() {
         time_t diff = elapsedTime(startTime, endTime);
         printf("%s elapsed time[ms]=%ld\n",__func__, diff);
 
-        usleep(50000);
+        usleep(10000);
     }
 
 
