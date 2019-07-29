@@ -1,0 +1,9 @@
+git clone https://github.com/mzimmerman/cwiid/
+sudo apt-get install bison flex libgtk2.0-dev autotools-dev automake libbluetooth-dev
+cd cwiid
+aclocal
+autoconf
+./configure --with-cwiid-config-dir=/etc/cwiid/
+make
+sudo make install
+
