@@ -56,8 +56,6 @@ int main(void){
 		return -1;
 	}
 
-    sleep(1);
-
     printf("get button\n");
 	toggle_bit(rpt_mode, CWIID_RPT_BTN);
 	set_rpt_mode(wiimote, rpt_mode);

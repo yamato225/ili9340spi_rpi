@@ -7,7 +7,12 @@
 #include <time.h>
 #include <sys/time.h>
 
+#include <stdarg.h>
+
 #include "ili9340.h"
+
+#include <bluetooth/bluetooth.h>
+#include <cwiid.h>
 
 #define JAPANESE 1
 #define _DEBUG_ 0
@@ -17,6 +22,28 @@
 
 //When you'd like to wait in the waiting time, enable this line.
 #define WAIT sleep(5)
+
+#define toggle_bit(bf,b)	\
+	(bf) = ((bf) & b)		\
+	       ? ((bf) & ~(b))	\
+	       : ((bf) | (b))
+
+cwiid_err_t err;
+void err(cwiid_wiimote_t *wiimote, const char *s, va_list ap)
+{
+	if (wiimote) printf("%d:", cwiid_get_id(wiimote));
+	else printf("-1:");
+	vprintf(s, ap);
+	printf("\n");
+}
+
+void set_rpt_mode(cwiid_wiimote_t *wiimote, unsigned char rpt_mode)
+{
+	if (cwiid_set_rpt_mode(wiimote, rpt_mode)) {
+		fprintf(stderr, "Error setting report mode\n");
+	}
+}
+
 
 int ReadTFTConfig(char *path, int *width, int *height, int *offsetx, int *offsety) {
   FILE *fp;
@@ -74,10 +101,10 @@ time_t ColorBarTest(int width, int height) {
     return diff;
 }
 
-#define draw_width 12
-#define draw_height 16 
-#define grid_width 14
-#define grid_height 20
+#define draw_width 13
+#define draw_height 23
+#define grid_width 15
+#define grid_height 27
 #define draw_start_y 18
 #define draw_start_x 1
 
@@ -92,7 +119,7 @@ void lcddrawGrid(int drawGrid[]){
             }else{
                 color=BLACK;
             }
-            lcdDrawFillRect(draw_x*11, draw_y*10, draw_x*11+9, draw_y*10+8, color);
+            lcdDrawFillRect(draw_x*9, draw_y*7, draw_x*9+7, draw_y*7+5, color);
         }
     }
 }
@@ -161,14 +188,46 @@ time_t tetris() {
     for(y=0;y<grid_height;y++){
         for(x=0;x<grid_width;x++){
             gridMat[y*grid_width+x]=0;
-            if(x==0 || x==13 || y==19 || (y>16 && rand()%2==0)){
+            if(x==0 || x==grid_width-1 || y==grid_height-1){
                 gridMat[y*grid_width+x]=1;
             }
         }
     }
     
-    bool isTouch=false;
+    #if 1
+    //wiimote setup
+	cwiid_wiimote_t *wiimote;	/* wiimote handle */
+	struct cwiid_state state;	/* wiimote state */
+	bdaddr_t bdaddr;	/* bluetooth device address */
 
+    unsigned char led_state = 0;
+    unsigned char rpt_mode = 0;
+
+    cwiid_set_err(err);
+
+    bdaddr = *BDADDR_ANY;
+
+    i=0;
+	printf("Put Wiimote in discoverable mode now (press 1+2)...\n");
+	while (!(wiimote = cwiid_open(&bdaddr, 0))) {
+        i++;
+		fprintf(stderr, "Unable to connect to wiimote. Trying...(%d)\n",i);
+        if(i>2){
+            return -1;
+        }
+	}
+
+    printf("get button\n");
+	toggle_bit(rpt_mode, CWIID_RPT_BTN);
+	set_rpt_mode(wiimote, rpt_mode);
+
+    #endif
+
+
+
+
+    bool isTouch=false;
+    int isRotate=0;
     while(1){
         gettimeofday(&startTime, NULL);
 
@@ -181,6 +240,35 @@ time_t tetris() {
                 }
             }
             my++;
+            //controller
+            #if 1
+            if (cwiid_get_state(wiimote, &state)) {
+                fprintf(stderr, "Error getting state\n");
+            }
+            printf("Buttons: ");
+            if (state.buttons & CWIID_BTN_LEFT){
+                mx--;
+                printf("←");
+            }
+            if (state.buttons & CWIID_BTN_RIGHT){
+                mx++;
+                printf("→");
+            }
+            if (state.buttons==CWIID_BTN_B){
+                isRotate++;
+                printf("↑");
+            }
+            if (state.buttons & CWIID_BTN_DOWN){
+                printf("↓");
+            }
+            printf("\n");
+
+            if(state.buttons==CWIID_BTN_HOME){
+                printf("break!!!\n\n");
+                break;
+            }
+
+            #endif
         }else{
             printf("RESET\n\n");
 
@@ -207,7 +295,7 @@ time_t tetris() {
                     debugGrid(gridMat);
                     for(y=0;y<draw_height;y++){
                         for(x=0;x<draw_width;x++){
-                            drawGrid[y*draw_width+x]=gridMat[(18-y)*grid_width+x+1];
+                            drawGrid[y*draw_width+x]=gridMat[(grid_height-2-y)*grid_width+x+1];
                         }
                     }
                     lcddrawGrid(drawGrid);
@@ -218,10 +306,11 @@ time_t tetris() {
                 }
             }
 
-            mx=(mx+1)%13;my=0;
+            //mx=(mx+1)%13;my=0;
+            mx=6;my=0;
             
-            //i=rand()%5;
-            i=2;
+            i=rand()%5;
+            //i=2;
             for(y=0;y<4;y++){
                 for(x=0;x<4;x++){
                     mino[x][y]=org_mino[i*16+y*4+x];
@@ -229,7 +318,8 @@ time_t tetris() {
             }
         }
 
-        if(false){
+        if(isRotate>1){
+            isRotate=0;
             for(y=0;y<4;y++){
                 for(x=0;x<4;x++){
                     tmp_mino[x][y]=mino[x][y];
@@ -282,7 +372,7 @@ time_t tetris() {
 
         for(y=0;y<draw_height;y++){
             for(x=0;x<draw_width;x++){
-                drawGrid[y*draw_width+x]=gridMat[(18-y)*grid_width+x+1];
+                drawGrid[y*draw_width+x]=gridMat[(grid_height-2-y)*grid_width+x+1];
             }
         }
 
@@ -292,7 +382,7 @@ time_t tetris() {
         time_t diff = elapsedTime(startTime, endTime);
         printf("%s elapsed time[ms]=%ld\n",__func__, diff);
 
-        usleep(10000);
+        usleep(50000);
     }
 
 
