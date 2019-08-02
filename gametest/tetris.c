@@ -119,7 +119,7 @@ void lcddrawGrid(int drawGrid[]){
             }else{
                 color=BLACK;
             }
-            lcdDrawFillRect(draw_x*9, draw_y*7, draw_x*9+7, draw_y*7+5, color);
+            lcdDrawFillRect(draw_x*10, draw_y*7, draw_x*10+7, draw_y*7+5, color);
         }
     }
 }
@@ -142,6 +142,7 @@ time_t tetris() {
     lcdFillScreen(BLACK);
 
     int gridMat[grid_width*grid_height];
+    int tmp_gridMat[grid_width*grid_height];
     int drawGrid[draw_width*draw_height];
 
     int mino[4][4];
@@ -177,7 +178,7 @@ time_t tetris() {
     int i;
     int draw_x,draw_y;
     int mx,my;
-    mx=0;my=0;
+    mx=4;my=0;
     i=2;
     for(y=0;y<4;y++){
         for(x=0;x<4;x++){
@@ -194,10 +195,10 @@ time_t tetris() {
         }
     }
     
+	struct cwiid_state state;	/* wiimote state */
     #if 1
     //wiimote setup
 	cwiid_wiimote_t *wiimote;	/* wiimote handle */
-	struct cwiid_state state;	/* wiimote state */
 	bdaddr_t bdaddr;	/* bluetooth device address */
 
     unsigned char led_state = 0;
@@ -228,38 +229,32 @@ time_t tetris() {
 
     bool isTouch=false;
     int isRotate=0;
+    int sleep_time=0;
+    int action_type=0;  //1:左移動,2:右移動, 4:回転
     while(1){
-        gettimeofday(&startTime, NULL);
-
+        //state.buttons = CWIID_BTN_LEFT;
         if (!isTouch){
-            for(y=0;y<4;y++){
-                for(x=0;x<4;x++){
-                    if (mino[x][y] >0){
-                        gridMat[(my+y)*grid_width+mx+x]=0;
-                    }
-                }
-            }
             my++;
-            //controller
-            #if 1
-            if (cwiid_get_state(wiimote, &state)) {
-                fprintf(stderr, "Error getting state\n");
-            }
-            printf("Buttons: ");
-            if (state.buttons & CWIID_BTN_LEFT){
+            action_type=0;
+            if (state.buttons == CWIID_BTN_LEFT){
+                action_type=1;
                 mx--;
-                printf("←");
             }
-            if (state.buttons & CWIID_BTN_RIGHT){
+            if (state.buttons == CWIID_BTN_RIGHT){
+                action_type=2;
                 mx++;
-                printf("→");
             }
-            if (state.buttons==CWIID_BTN_B){
-                isRotate++;
-                printf("↑");
+            if (state.buttons==CWIID_BTN_UP){
+                action_type=1;
+                mx--;
+            }
+            if (state.buttons==CWIID_BTN_1 && isRotate< 1){
+                action_type=4;
+                isRotate=2;
             }
             if (state.buttons & CWIID_BTN_DOWN){
-                printf("↓");
+                action_type=2;
+                mx++;
             }
             printf("\n");
 
@@ -267,10 +262,16 @@ time_t tetris() {
                 printf("break!!!\n\n");
                 break;
             }
-
-            #endif
         }else{
-            printf("RESET\n\n");
+            printf("\n\n-----------------RESET----------------\n\n");
+
+            for(y=0;y<4;y++){
+                for(x=0;x<4;x++){
+                    if (mino[x][y] >0){
+                        gridMat[(my+y)*grid_width+mx+x]=1;
+                    }
+                }
+            }
 
             //そろってるかチェック
             int xblock_num=0;
@@ -284,11 +285,12 @@ time_t tetris() {
                 if(xblock_num == grid_width){
                     //何らかのエフェクトを加える
                     //1行下にずらす。
-                    int empty_row[grid_width]={1,0,0,0,0,0,0,0,0,0,0,0,0,1};
-                    int tmp_gridMat[grid_width*grid_height];
-                    for(i=0;i<grid_width*grid_height;i++){
+                    int empty_row[grid_width]={1,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
+                    //int tmp_gridMat[grid_width*grid_height];
+                    /* for(i=0;i<grid_width*grid_height;i++){
                         tmp_gridMat[i]=gridMat[i];
-                    }
+                    }*/
+                    memcpy(tmp_gridMat,gridMat,sizeof(gridMat));
                     for(i=0;i<grid_width*(check_y+1);i++){
                         gridMat[i]=i<grid_width ? empty_row[i] : tmp_gridMat[i-grid_width];
                     }
@@ -299,7 +301,6 @@ time_t tetris() {
                         }
                     }
                     lcddrawGrid(drawGrid);
-                    sleep(1);
                 }else{
                     printf("else\n");
                     check_y--;
@@ -307,7 +308,7 @@ time_t tetris() {
             }
 
             //mx=(mx+1)%13;my=0;
-            mx=6;my=0;
+            mx=4;my=0;
             
             i=rand()%5;
             //i=2;
@@ -318,26 +319,16 @@ time_t tetris() {
             }
         }
 
-        if(isRotate>1){
-            isRotate=0;
-            for(y=0;y<4;y++){
-                for(x=0;x<4;x++){
-                    tmp_mino[x][y]=mino[x][y];
-                }
-            }
+        memcpy(tmp_mino,mino,sizeof(mino));
+        if(isRotate==2){
             for(y=0;y<4;y++){
                 for(x=0;x<4;x++){
                     mino[3-y][x]=tmp_mino[x][y];
                 }
             }
         }
-
-        for(y=0;y<4;y++){
-            for(x=0;x<4;x++){
-                if (mino[x][y] >0){
-                    gridMat[(my+y)*grid_width+mx+x]=1;
-                }
-            }
+        if(isRotate>0){
+            isRotate--;
         }
 
         debugGrid(gridMat);
@@ -354,6 +345,35 @@ time_t tetris() {
         }
         printf("----------------\n");
 
+        //重なっていたら動作をもとに戻す。
+        bool isImpossible=false;
+        for(y=0;y<4;y++){
+            for(x=0;x<4;x++){
+                if (mino[x][y] >0 && gridMat[(my+y)*grid_width+mx+x]>0){
+                    isImpossible=true;
+                }  
+            }
+        }
+
+        if(isImpossible){
+            printf("DUPLICATE!!!!-----------------\n\n");
+            switch(action_type){
+                case 1:
+                    mx++;
+                    break;
+                case 2:
+                    mx--;
+                    break;
+                case 4:
+                    memcpy(mino,tmp_mino,sizeof(mino));
+                    break;
+                default:
+                    break;
+            }
+        }
+
+
+        //下部接触
         isTouch=false;
         for(y=3;y>=0;y--){
             for(x=0;x<4;x++){
@@ -370,19 +390,60 @@ time_t tetris() {
         }
         printf("\n");
 
-        for(y=0;y<draw_height;y++){
-            for(x=0;x<draw_width;x++){
-                drawGrid[y*draw_width+x]=gridMat[(grid_height-2-y)*grid_width+x+1];
+        memcpy(tmp_gridMat,gridMat,sizeof(gridMat));
+        for(y=0;y<4;y++){
+            for(x=0;x<4;x++){
+                if (mino[x][y] >0){
+                    tmp_gridMat[(my+y)*grid_width+mx+x]=1;
+                }
             }
         }
+
+        for(y=0;y<draw_height;y++){
+            for(x=0;x<draw_width;x++){
+                drawGrid[y*draw_width+x]=tmp_gridMat[(grid_height-2-y)*grid_width+x+1];
+            }
+        }
+
+
+        printf("(%02d,%02d)\n",mx,my);
+
+        #if 0
+        printf("draw:----------------------------\n");
+        for(y=0;y<draw_height;y++){
+            printf("%02d:",y);
+            for(x=0;x<draw_width;x++){
+                printf("%d",drawGrid[y*draw_width+x]);
+            }
+            printf("\n");
+        }
+        printf("---------------------------\n");
+        #endif
 
         lcddrawGrid(drawGrid);
 
         gettimeofday(&endTime, NULL);
-        time_t diff = elapsedTime(startTime, endTime);
+        int diff = (int)elapsedTime(startTime, endTime);
         printf("%s elapsed time[ms]=%ld\n",__func__, diff);
 
-        usleep(50000);
+        if (diff<100){
+            usleep(300000 - diff*1000);
+        }
+        gettimeofday(&startTime, NULL);
+
+        #if 1
+        for(i=0;i<300;i++){
+            //controller
+            if (cwiid_get_state(wiimote, &state)) {
+                fprintf(stderr, "Error getting state\n");
+            }
+            if(state.buttons > 0){
+                break;
+            }
+
+            usleep(500);
+        }
+        #endif
     }
 
 
